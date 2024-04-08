@@ -13,3 +13,12 @@ Example:
 `kubectl ktalk give me the number of containers in the clusters that are running as root`
 
 Are you sure want to execute the following command? Press Enter to execute this:  `kubectl get pods --all-namespaces -o jsonpath='{..securityContext.privileged}' | grep -o "true" | wc -l`
+
+
+## Setup
+
+Export `OPENAI_API_KEY` in your environment.
+
+Build the plugin: `go build -o kubectl-ktalk`
+
+Copy the plugin to bin: `cp kubectl-ktalk /usr/local/bin`
