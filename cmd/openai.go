@@ -24,7 +24,10 @@ func OpenAIRequest(ChatPrompt string) error {
 
 	client := resty.New()
 
-	kubectlCommandOnly := "give me just the command so that I can copy the command and paste it in my terminal, the command must start with kubectl without any quotes."
+	kubectlCommandOnly := `
+	Response Requirements: 
+	1. The response should be a just a kubectl command. 
+	2. The command must start with kubectl without any quotes.`
 
 	// Create a new request to the OpenAI API
 	resp, err := client.R().
