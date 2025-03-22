@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -32,60 +31,21 @@ func validateKubectlCommand(command string) error {
 	return nil
 }
 
-// RunCommand executes a kubectl command with proper security and output handling
+// RunCommand executes the given kubectl command
 func RunCommand(command string) error {
-	// Validate the command first
-	if err := validateKubectlCommand(command); err != nil {
-		return fmt.Errorf("command validation failed: %w", err)
+	// Validate the command - no pipes with kubectl
+	if strings.Contains(command, "|") {
+		return fmt.Errorf("kubectl commands with pipes are not supported in this version. Try using an alternative command without pipes")
 	}
 
-	// Create a context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
-	defer cancel()
-
-	// Split command into args
-	args := strings.Fields(command)
-	if len(args) < 2 {
-		return fmt.Errorf("invalid command format")
-	}
-
-	// Create command with context
-	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
-
-	// Set up command IO
+	// Use shell to execute the command
+	cmd := exec.Command("sh", "-c", command)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
 
-	// Create a channel to handle command interruption
-	sigChan := make(chan os.Signal, 1)
-	defer close(sigChan)
-
-	// Start the command
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start command: %w", err)
+	// Run the command
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("command failed with exit code %d: %s", cmd.ProcessState.ExitCode(), err)
 	}
-
-	// Wait for command completion or interruption
-	errChan := make(chan error, 1)
-	go func() {
-		errChan <- cmd.Wait()
-	}()
-
-	select {
-	case err := <-errChan:
-		if err != nil {
-			if exitErr, ok := err.(*exec.ExitError); ok {
-				return fmt.Errorf("command failed with exit code %d: %s", exitErr.ExitCode(), exitErr.Stderr)
-			}
-			return fmt.Errorf("command failed: %w", err)
-		}
-	case <-ctx.Done():
-		if err := cmd.Process.Kill(); err != nil {
-			return fmt.Errorf("failed to kill command: %w", err)
-		}
-		return fmt.Errorf("command timed out after %v", defaultTimeout)
-	}
-
 	return nil
 }
