@@ -21,9 +21,20 @@ func NewPrompt(streams genericclioptions.IOStreams) *cobra.Command {
 
 	// ktalk command definition
 	cmd := &cobra.Command{
-		Use:          "ktalk",
-		Short:        "ktalk talks to your Kubernetes cluster",
-		Long:         "ktalk uses the OpenAI API to generate kubectl commands based on natural language descriptions",
+		Use:   "ktalk",
+		Short: "ktalk talks to your Kubernetes cluster",
+		Long:  "ktalk uses the OpenAI API to generate kubectl commands based on natural language descriptions.\nNote: If your query ends with a question mark (?), you'll need to either quote your query, escape the question mark with a backslash, or use the special placeholder 'QUESTION' at the end.",
+		Example: `  # Basic usage
+  kubectl ktalk give me the list of containers in kube-system namespace
+  
+  # Using quotes for questions (recommended)
+  kubectl ktalk "how many pods are running in the cluster?"
+  
+  # Escaping question marks
+  kubectl ktalk how many pods are running in the cluster\?
+  
+  # Using the QUESTION placeholder
+  kubectl ktalk how many users in the cluster QUESTION`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
@@ -38,6 +49,12 @@ func NewPrompt(streams genericclioptions.IOStreams) *cobra.Command {
 
 			// Combine all arguments into a single prompt
 			chatPrompt := strings.Join(args, " ")
+
+			// Replace the QUESTION placeholder with an actual question mark
+			if strings.HasSuffix(chatPrompt, " QUESTION") {
+				chatPrompt = strings.TrimSuffix(chatPrompt, " QUESTION") + "?"
+			}
+
 			return o.run(chatPrompt)
 		},
 	}
