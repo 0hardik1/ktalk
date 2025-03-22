@@ -12,16 +12,11 @@ import (
 const (
 	// APIEndpoint is the URL for the OpenAI API
 	APIEndpoint = "https://api.openai.com/v1/chat/completions"
+	// Using gpt-3.5-turbo as it's more stable, cost-effective, and sufficient for kubectl command generation
+	ModelName = "gpt-3.5-turbo"
 )
 
-func OpenAIRequest(ChatPrompt string) error {
-
-	// Find API key from environment variable
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		return fmt.Errorf("OPENAI_API_KEY environment variable not set")
-	}
-
+func OpenAIRequest(chatPrompt, apiKey string) error {
 	client := resty.New()
 
 	kubectlCommandOnly := `
@@ -34,46 +29,42 @@ func OpenAIRequest(ChatPrompt string) error {
 		SetAuthToken(apiKey).
 		SetHeader("Content-Type", "application/json").
 		SetBody(map[string]interface{}{
-			"model": "gpt-4-0125-preview",
+			"model": ModelName,
 			"messages": []interface{}{map[string]interface{}{"role": "system",
-				"content": ChatPrompt + kubectlCommandOnly}},
+				"content": chatPrompt + kubectlCommandOnly}},
 			"max_tokens": 50,
 		}).
 		Post(APIEndpoint)
 
 	if err != nil {
-		fmt.Println("Error when sending request to OpenAI API", err)
-		return err
+		return fmt.Errorf("failed to send request to OpenAI API: %w", err)
 	}
 
 	body := resp.Body()
 
 	var response map[string]interface{}
-	err = json.Unmarshal(body, &response)
-	if err != nil {
-		fmt.Println("Error when unmarshalling response from OpenAI API", err)
-		return err
+	if err := json.Unmarshal(body, &response); err != nil {
+		return fmt.Errorf("failed to unmarshal response from OpenAI API: %w", err)
 	}
 
 	// Extract the content from the JSON response
-	content := response["choices"].([]interface{})[0].(map[string]interface{})["message"].(map[string]interface{})["content"].(string)
+	content, ok := response["choices"].([]interface{})[0].(map[string]interface{})["message"].(map[string]interface{})["content"].(string)
+	if !ok {
+		return fmt.Errorf("unexpected response format from OpenAI API")
+	}
 
 	fmt.Println("Are you sure want to execute the following command? Press Enter to execute this: ", content)
 
 	// Agreed to execute?
 	agreement, err := bufio.NewReader(os.Stdin).ReadString('\n')
 	if err != nil {
-		fmt.Println("Error reading input: ", err)
-		return err
+		return fmt.Errorf("failed to read input: %w", err)
 	}
 
 	if agreement == "\n" {
-		err := RunCommand(content)
-		if err != nil {
-			fmt.Println("Error when running command", err)
-			return err
+		if err := RunCommand(content); err != nil {
+			return fmt.Errorf("failed to run command: %w", err)
 		}
-		return nil
 	}
 	return nil
 }
