@@ -12,7 +12,7 @@ import (
 
 type Options struct {
 	genericclioptions.IOStreams
-	OpenAIKey string
+	AnthropicKey string
 }
 
 func NewPrompt(streams genericclioptions.IOStreams) *cobra.Command {
@@ -24,7 +24,7 @@ func NewPrompt(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ktalk",
 		Short: "ktalk talks to your Kubernetes cluster",
-		Long:  "ktalk uses the OpenAI API to generate kubectl commands based on natural language descriptions.\nNote: If your query ends with a question mark (?), you'll need to either quote your query, escape the question mark with a backslash, or use the special placeholder 'QUESTION' at the end.\n\nRunning 'kubectl ktalk' without arguments starts interactive mode.",
+		Long:  "ktalk uses the Anthropic Claude API to generate kubectl commands based on natural language descriptions.\nNote: If your query ends with a question mark (?), you'll need to either quote your query, escape the question mark with a backslash, or use the special placeholder 'QUESTION' at the end.\n\nRunning 'kubectl ktalk' without arguments starts interactive mode.",
 		Example: `  # Basic usage
   kubectl ktalk give me the list of containers in kube-system namespace
   
@@ -41,10 +41,9 @@ func NewPrompt(streams genericclioptions.IOStreams) *cobra.Command {
   kubectl ktalk`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get OpenAI API key from environment
-			o.OpenAIKey = os.Getenv("OPENAI_API_KEY")
-			if o.OpenAIKey == "" {
-				return fmt.Errorf("OPENAI_API_KEY environment variable is not set")
+			o.AnthropicKey = os.Getenv("ANTHROPIC_API_KEY")
+			if o.AnthropicKey == "" {
+				return fmt.Errorf("ANTHROPIC_API_KEY environment variable is not set")
 			}
 
 			if len(args) == 0 {
@@ -100,8 +99,8 @@ func (o *Options) runInteractiveMode() error {
 }
 
 func (o *Options) run(chatPrompt string) error {
-	if err := OpenAIRequest(chatPrompt, o.OpenAIKey); err != nil {
-		return fmt.Errorf("error when sending request to OpenAI API: %w", err)
+	if err := ClaudeRequest(chatPrompt, o.AnthropicKey); err != nil {
+		return fmt.Errorf("error when sending request to Anthropic API: %w", err)
 	}
 	return nil
 }
